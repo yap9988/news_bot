@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Bot - Strategic Board</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .nav { background: #333; padding: 10px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .nav a { color: white; text-decoration: none; margin: 0 15px; font-weight: bold; }
+        .nav a:hover { color: #4CAF50; }
+        .header { text-align: center; color: #333; margin-bottom: 30px; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 25px; margin-bottom: 25px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; }
+        th, td { text-align: left; padding: 12px; border: 1px solid #eee; font-size: 14px; }
+        th { background-color: #2e7d32; color: white; }
+        tr:nth-child(even) { background-color: #f9f9f9; }
+        .form-row { display: grid; grid-template-columns: repeat(6, 1fr) 100px; gap: 10px; margin-bottom: 20px; background: #e8f5e9; padding: 15px; border-radius: 8px; }
+        input, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-add { background-color: #2e7d32; }
+        .btn-edit { background-color: #008CBA; padding: 4px 8px; font-size: 12px; }
+        .btn-delete { background-color: #f44336; padding: 4px 8px; font-size: 12px; margin-top: 5px; display: block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/">Dashboard</a>
+            <a href="/todo">Focus List</a>
+            <a href="/digest">AI Digest</a>
+            <a href="/insights">Strategic Insights</a>
+            <a href="/board">Board</a>
+            <a href="/categories">Category Manager</a>
+            <a href="/removal">Removal</a>
+        </div>
+        <div class="header">
+            <h1>Strategic Board</h1>
+            <p>Manual Cause & Effect Tracking</p>
+        </div>
+
+        <div class="card">
+            <h3>Add New Entry</h3>
+            <div class="form-row">
+                <input type="text" id="new-date" placeholder="Date (e.g. 2026-03-03)">
+                <input type="text" id="new-cause" placeholder="Cause">
+                <input type="text" id="new-e1" placeholder="Effect 1">
+                <input type="text" id="new-e2" placeholder="Effect 2">
+                <input type="text" id="new-e3" placeholder="Effect 3">
+                <input type="text" id="new-e4" placeholder="Effect 4">
+                <button class="btn btn-add" onclick="addEntry()">ADD</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <table id="board-table">
+                <thead>
+                    <tr>
+                        <th style="width: 100px;">Date</th>
+                        <th style="width: 200px;">Cause</th>
+                        <th>Effect 1</th>
+                        <th>Effect 2</th>
+                        <th>Effect 3</th>
+                        <th>Effect 4</th>
+                        <th style="width: 80px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="board-body">
+                    <tr><td colspan="7" style="text-align: center;">Loading board...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function loadBoard() {
+            fetch('/api/board').then(res => res.json()).then(entries => {
+                const body = document.getElementById('board-body');
+                if (entries.length === 0) { body.innerHTML = '<tr><td colspan="7" style="text-align: center;">No entries yet.</td></tr>'; return; }
+                let html = '';
+                entries.forEach(e => {
+                    html += `
+                        <tr data-id="${e.id}">
+                            <td>${e.date || ''}</td>
+                            <td><strong>${e.cause || ''}</strong></td>
+                            <td id="e1-${e.id}">${e.effect1 || ''}</td>
+                            <td id="e2-${e.id}">${e.effect2 || ''}</td>
+                            <td id="e3-${e.id}">${e.effect3 || ''}</td>
+                            <td id="e4-${e.id}">${e.effect4 || ''}</td>
+                            <td>
+                                <button class="btn btn-edit" onclick="editEntry(${e.id})">Edit</button>
+                                <button class="btn btn-delete" onclick="deleteEntry(${e.id})">Del</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                body.innerHTML = html;
+            });
+        }
+
+        function addEntry() {
+            const data = {
+                date: document.getElementById('new-date').value,
+                cause: document.getElementById('new-cause').value,
+                effect1: document.getElementById('new-e1').value,
+                effect2: document.getElementById('new-e2').value,
+                effect3: document.getElementById('new-e3').value,
+                effect4: document.getElementById('new-e4').value
+            };
+            fetch('/api/board/add', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            }).then(() => {
+                // Clear form and reload
+                ['new-date', 'new-cause', 'new-e1', 'new-e2', 'new-e3', 'new-e4'].forEach(id => document.getElementById(id).value = '');
+                loadBoard();
+            });
+        }
+
+        function deleteEntry(id) {
+            if (!confirm("Soft delete this row?")) return;
+            fetch(`/api/board/delete/${id}`, { method: 'DELETE' }).then(() => loadBoard());
+        }
+
+        function editEntry(id) {
+            const row = document.querySelector(`tr[data-id="${id}"]`);
+            const cells = row.querySelectorAll('td');
+            const date = prompt("Edit Date:", cells[0].innerText);
+            const cause = prompt("Edit Cause:", cells[1].innerText);
+            const e1 = prompt("Edit Effect 1:", cells[2].innerText);
+            const e2 = prompt("Edit Effect 2:", cells[3].innerText);
+            const e3 = prompt("Edit Effect 3:", cells[4].innerText);
+            const e4 = prompt("Edit Effect 4:", cells[5].innerText);
+            
+            if (date !== null) {
+                fetch(`/api/board/update/${id}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({date, cause, effect1: e1, effect2: e2, effect3: e3, effect4: e4})
+                }).then(() => loadBoard());
+            }
+        }
+
+        loadBoard();
+    </script>
+</body>
+</html>

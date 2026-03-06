@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Bot Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .nav { background: #333; padding: 10px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .nav a { color: white; text-decoration: none; margin: 0 15px; font-weight: bold; }
+        .nav a:hover { color: #4CAF50; }
+        .header { text-align: center; color: #333; margin-bottom: 30px; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        .article { border-bottom: 1px solid #eee; padding: 15px 0; }
+        .article:last-child { border-bottom: none; }
+        .article-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        .article-link { color: #0066cc; text-decoration: none; flex-grow: 1; }
+        .article-link:hover { text-decoration: underline; }
+        .article-meta { font-size: 12px; color: #666; margin-bottom: 10px; }
+        .article-summary { font-size: 14px; color: #333; line-height: 1.4; }
+        .status-indicator { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+        .processed { background-color: #4CAF50; }
+        .unprocessed { background-color: #f44336; }
+        .btn-todo { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 5px; white-space: nowrap; }
+        .btn-add { background-color: #008CBA; color: white; }
+        .btn-remove { background-color: #f44336; color: white; }
+        .btn-digest { background-color: #673ab7; color: white; padding: 10px 20px; font-size: 14px; border-radius: 8px; font-weight: bold; margin: 0 5px 20px 5px; }
+        .btn-insight { background-color: #2e7d32; color: white; padding: 10px 20px; font-size: 14px; border-radius: 8px; font-weight: bold; margin: 0 5px 20px 5px; }
+        .btn-digest:disabled, .btn-insight:disabled { background-color: #ccc; cursor: not-allowed; }
+        .actions { display: flex; }
+        .pagination { display: flex; justify-content: center; padding: 20px 0; gap: 10px; align-items: center; }
+        .btn-page { padding: 8px 16px; background-color: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; text-decoration: none; color: #333; }
+        .btn-page:hover { background-color: #f0f0f0; }
+        .btn-page.active { background-color: #4CAF50; color: white; border-color: #4CAF50; }
+        .btn-page:disabled { background-color: #eee; cursor: not-allowed; color: #999; }
+        .source-tag { background: #e0e0e0; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-right: 5px; }
+        .news-tag { background: #e1f5fe; color: #01579b; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 4px; border: 1px solid #b3e5fc; }
+        #update-status { font-size: 12px; color: #888; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/">Dashboard</a>
+            <a href="/todo">Focus List</a>
+            <a href="/digest">AI Digest</a>
+            <a href="/insights">Strategic Insights</a>
+            <a href="/board">Board</a>
+            <a href="/categories">Category Manager</a>
+            <a href="/removal">Removal</a>
+        </div>
+        <div class="header">
+            <h1>News Bot Dashboard</h1>
+            <p>View saved articles and feed information</p>
+            <p><small>All times are shown in {{ timezone }}</small></p>
+            <div id="update-status">Auto-updating enabled (every 30s)</div>
+        </div>
+
+        <div style="text-align: center; display: flex; justify-content: center; flex-wrap: wrap;">
+            <button class="btn-digest" id="gen-digest-btn" onclick="generateDigest()">Summarize & Purge (AI Digest)</button>
+            <button class="btn-insight" id="gen-insight-btn" onclick="generateInsight()">Deduce Market Effects (AI Insight)</button>
+        </div>
+        <div id="process-status-msg" style="text-align: center; margin-bottom: 20px; font-size: 13px; color: #333; font-weight: bold;"></div>
+
+        <div class="card">
+            <h2>Recent Articles</h2>
+            <div id="articles-list"><p>Loading articles...</p></div>
+            <div id="pagination" class="pagination"></div>
+        </div>
+
+        <div class="card">
+            <h2>Configured Feeds</h2>
+            <div id="feeds-list"><p>Loading feeds...</p></div>
+        </div>
+    </div>
+    <audio id="notification-sound" preload="auto">
+        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+    </audio>
+    <script>
+        let currentPage = 1; let lastArticleId = null; const notificationSound = document.getElementById('notification-sound');
+        
+        function checkStatus() {
+            fetch('/api/digest/status').then(res => res.json()).then(data => {
+                const btn = document.getElementById('gen-digest-btn');
+                if (data.is_generating) { btn.disabled = true; btn.innerText = "Digest Generating..."; }
+                else { btn.disabled = false; btn.innerText = "Summarize & Purge (AI Digest)"; }
+            });
+            fetch('/api/insight/status').then(res => res.json()).then(data => {
+                const btn = document.getElementById('gen-insight-btn');
+                if (data.is_generating) { btn.disabled = true; btn.innerText = "Insights Generating..."; }
+                else { btn.disabled = false; btn.innerText = "Deduce Market Effects (AI Insight)"; }
+            });
+        }
+
+        function generateDigest() {
+            if (!confirm("Summarize articles and purge them from dashboard?")) return;
+            fetch('/api/digest/generate', { method: 'POST' }).then(res => res.json()).then(data => {
+                if (data.success) { alert(data.message); checkStatus(); }
+                else alert(data.error);
+            });
+        }
+
+        function generateInsight() {
+            if (!confirm("Deduce market effects from newest AI Digests?")) return;
+            fetch('/api/insight/generate', { method: 'POST' }).then(res => res.json()).then(data => {
+                if (data.success) { alert(data.message); checkStatus(); }
+                else alert(data.error);
+            });
+        }
+
+        function toggleTodo(articleId) {
+            fetch(`/api/todo/toggle/${articleId}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    const btn = document.querySelector(`button.todo-toggle[data-id="${articleId}"]`);
+                    if (btn) {
+                        const isTodo = data.is_todo;
+                        btn.className = `btn-todo todo-toggle ${isTodo ? 'btn-remove' : 'btn-add'}`;
+                        btn.innerText = isTodo ? 'Remove from Focus' : 'Add to Focus';
+                    }
+                });
+        }
+        function playDing() { notificationSound.play().catch(e => {}); }
+        function loadArticles(page = 1, isAutoUpdate = false) {
+            currentPage = page;
+            fetch(`/api/articles?page=${page}`)
+                .then(response => response.json())
+                .then(data => {
+                    const articlesList = document.getElementById('articles-list');
+                    if (data.error) { articlesList.innerHTML = `<p>Error: ${data.error}</p>`; return; }
+                    if (data.articles.length === 0) { articlesList.innerHTML = '<p>No articles found.</p>'; return; }
+                    const newestId = data.articles[0].id;
+                    if (lastArticleId !== null && newestId > lastArticleId && currentPage === 1) playDing();
+                    lastArticleId = newestId;
+                    let html = '';
+                    data.articles.forEach(article => {
+                        const statusClass = article.processed ? 'processed' : 'unprocessed';
+                        const statusText = article.processed ? 'Processed' : 'Unprocessed';
+                        const todoBtnClass = article.is_todo ? 'btn-remove' : 'btn-add';
+                        const todoBtnText = article.is_todo ? 'Remove from Focus' : 'Add to Focus';
+                        let tagsHtml = '';
+                        if (article.tags) {
+                            article.tags.split(',').forEach(tag => {
+                                let displayTag = tag.trim();
+                                let isNew = displayTag.startsWith('NEW:');
+                                tagsHtml += `<span class="news-tag" style="${isNew ? 'background:#fff3e0; color:#e65100; border-color:#ffe0b2;' : ''}">${displayTag}</span>`;
+                            });
+                        }
+                        html += `
+                            <div class="article" data-id="${article.id}">
+                                <div class="article-title">
+                                    <a href="${article.link}" class="article-link" target="_blank">${article.title}</a>
+                                    <div class="actions">
+                                        <button class="btn-todo todo-toggle ${todoBtnClass}" data-id="${article.id}" onclick="toggleTodo(${article.id})">
+                                            ${todoBtnText}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="article-meta">
+                                    <span class="status-indicator ${statusClass}"></span>
+                                    <span class="source-tag">${article.source}</span>
+                                    ${statusText} | Created: ${article.created_at || 'Unknown'}
+                                </div>
+                                <div style="margin-bottom: 10px;">${tagsHtml}</div>
+                                <div class="article-summary">${article.summary || 'No summary available'}</div>
+                            </div>
+                        `;
+                    });
+                    articlesList.innerHTML = html;
+                    renderPagination(data);
+                    if (!isAutoUpdate) window.scrollTo(0, 0);
+                });
+        }
+        function renderPagination(data) {
+            const pagination = document.getElementById('pagination');
+            let html = '';
+            if (data.total_pages <= 1) { pagination.innerHTML = ''; return; }
+            html += `<button class="btn-page" ${data.page === 1 ? 'disabled' : ''} onclick="loadArticles(${data.page - 1})">Prev</button>`;
+            let startPage = Math.max(1, data.page - 2);
+            let endPage = Math.min(data.total_pages, startPage + 4);
+            if (endPage === data.total_pages) startPage = Math.max(1, endPage - 4);
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="btn-page ${i === data.page ? 'active' : ''}" onclick="loadArticles(${i})">${i}</button>`;
+            }
+            html += `<button class="btn-page" ${data.page === data.total_pages ? 'disabled' : ''} onclick="loadArticles(${data.page + 1})">Next</button>`;
+            pagination.innerHTML = html;
+        }
+
+        loadArticles(1);
+        checkStatus();
+        setInterval(() => { if (currentPage === 1) loadArticles(1, true); checkStatus(); }, 30000);
+
+        fetch('/api/feeds').then(response => response.json()).then(feeds => {
+            const feedsList = document.getElementById('feeds-list');
+            if (feeds.length === 0) { feedsList.innerHTML = '<p>No feeds configured.</p>'; return; }
+            let html = '<ul>';
+            feeds.forEach(feed => {
+                const statusText = feed.active ? 'Active' : 'Inactive';
+                const lastChecked = feed.last_checked ? `Last checked: ${feed.last_checked}` : 'Never checked';
+                html += `<li><strong>${feed.url}</strong> - ${statusText}<br><small>${lastChecked} | Added: ${feed.created_at}</small></li>`;
+            });
+            html += '</ul>';
+            feedsList.innerHTML = html;
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>News Bot - Focus List</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .nav { background: #333; padding: 10px; border-radius: 8px; margin-bottom: 20px; text-align: center; }
+        .nav a { color: white; text-decoration: none; margin: 0 15px; font-weight: bold; }
+        .nav a:hover { color: #4CAF50; }
+        .header { text-align: center; color: #333; margin-bottom: 30px; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        .article { border-bottom: 1px solid #eee; padding: 15px 0; }
+        .article:last-child { border-bottom: none; }
+        .article-title { font-size: 18px; font-weight: bold; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        .article-link { color: #0066cc; text-decoration: none; flex-grow: 1; }
+        .article-link:hover { text-decoration: underline; }
+        .article-meta { font-size: 12px; color: #666; margin-bottom: 10px; }
+        .article-summary { font-size: 14px; color: #333; line-height: 1.4; }
+        .btn-todo { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 5px; white-space: nowrap; }
+        .btn-remove { background-color: #f44336; color: white; }
+        .source-tag { background: #e0e0e0; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-right: 5px; }
+        .news-tag { background: #e1f5fe; color: #01579b; padding: 2px 6px; border-radius: 4px; font-size: 11px; margin-right: 4px; border: 1px solid #b3e5fc; }
+        .pagination { display: flex; justify-content: center; padding: 20px 0; gap: 10px; align-items: center; }
+        .btn-page { padding: 8px 16px; background-color: white; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; text-decoration: none; color: #333; }
+        .btn-page:hover { background-color: #f0f0f0; }
+        .btn-page.active { background-color: #4CAF50; color: white; border-color: #4CAF50; }
+        .btn-page:disabled { background-color: #eee; cursor: not-allowed; color: #999; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/">Dashboard</a>
+            <a href="/todo">Focus List</a>
+            <a href="/digest">AI Digest</a>
+            <a href="/insights">Strategic Insights</a>
+            <a href="/board">Board</a>
+            <a href="/categories">Category Manager</a>
+            <a href="/removal">Removal</a>
+        </div>
+        <div class="header">
+            <h1>Focus List</h1>
+            <p>Your selected articles for deeper reading</p>
+            <p><small>All times are shown in {{ timezone }}</small></p>
+        </div>
+        <div class="card">
+            <h2>Saved for Later</h2>
+            <div id="articles-list"><p>Loading focus articles...</p></div>
+            <div id="pagination" class="pagination"></div>
+        </div>
+    </div>
+    <script>
+        let currentPage = 1;
+        function removeFromTodo(articleId) {
+            fetch(`/api/todo/toggle/${articleId}`, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => { loadTodo(currentPage); });
+        }
+        function loadTodo(page = 1) {
+            currentPage = page;
+            fetch(`/api/todo?page=${page}`)
+                .then(response => response.json())
+                .then(data => {
+                    const articlesList = document.getElementById('articles-list');
+                    if (data.error) { articlesList.innerHTML = `<p>Error: ${data.error}</p>`; return; }
+                    if (data.articles.length === 0) { articlesList.innerHTML = '<p>Your focus list is empty.</p>'; document.getElementById('pagination').innerHTML = ''; return; }
+                    let html = '';
+                    data.articles.forEach(article => {
+                        let tagsHtml = '';
+                        if (article.tags) {
+                            article.tags.split(',').forEach(tag => {
+                                let displayTag = tag.trim();
+                                let isNew = displayTag.startsWith('NEW:');
+                                tagsHtml += `<span class="news-tag" style="${isNew ? 'background:#fff3e0; color:#e65100; border-color:#ffe0b2;' : ''}">${displayTag}</span>`;
+                            });
+                        }
+                        html += `
+                            <div class="article" data-id="${article.id}">
+                                <div class="article-title">
+                                    <a href="${article.link}" class="article-link" target="_blank">${article.title}</a>
+                                    <div class="actions">
+                                        <button class="btn-todo btn-remove" onclick="removeFromTodo(${article.id})">Remove from Focus</button>
+                                    </div>
+                                </div>
+                                <div class="article-meta">
+                                    <span class="source-tag">${article.source}</span> | Created: ${article.created_at || 'Unknown'}
+                                </div>
+                                <div style="margin-bottom: 10px;">${tagsHtml}</div>
+                                <div class="article-summary">${article.summary || 'No summary available'}</div>
+                            </div>
+                        `;
+                    });
+                    articlesList.innerHTML = html;
+                    renderPagination(data);
+                    window.scrollTo(0, 0);
+                });
+        }
+        function renderPagination(data) {
+            const pagination = document.getElementById('pagination');
+            let html = '';
+            if (data.total_pages <= 1) { pagination.innerHTML = ''; return; }
+            html += `<button class="btn-page" ${data.page === 1 ? 'disabled' : ''} onclick="loadTodo(${data.page - 1})">Prev</button>`;
+            let startPage = Math.max(1, data.page - 2);
+            let endPage = Math.min(data.total_pages, startPage + 4);
+            if (endPage === data.total_pages) startPage = Math.max(1, endPage - 4);
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<button class="btn-page ${i === data.page ? 'active' : ''}" onclick="loadTodo(${i})">${i}</button>`;
+            }
+            html += `<button class="btn-page" ${data.page === data.total_pages ? 'disabled' : ''} onclick="loadTodo(${data.page + 1})">Next</button>`;
+            pagination.innerHTML = html;
+        }
+        loadTodo(1);
+    </script>
+</body>
+</html>
