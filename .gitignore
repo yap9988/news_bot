@@ -1,0 +1,23 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+ENV/
+env/
+
+# Database files
+*.db
+*.db-journal
+
+# Environment variables
+.env
+
+# IDE settings
+.vscode/
+.idea/
+
+# One-time migration scripts
+migrate*.py

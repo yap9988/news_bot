@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Moderation Panel - News Bot</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        
+        .nav { 
+            background: #333; padding: 10px 20px; border-radius: 8px; margin-bottom: 20px; 
+            display: flex; align-items: center; color: white;
+        }
+        .nav-links { flex-grow: 1; text-align: center; }
+        .nav a { color: white; text-decoration: none; margin: 0 15px; font-weight: bold; }
+        .nav a:hover { color: #4CAF50; }
+        
+        .user-menu { position: relative; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .user-name { font-weight: bold; color: #4CAF50; }
+        .dropdown-content {
+            display: none; position: absolute; right: 0; top: 100%;
+            background-color: #444; min-width: 160px; box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1000; border-radius: 4px; margin-top: 10px;
+        }
+        .dropdown-content a { color: white; padding: 12px 16px; text-decoration: none; display: block; font-size: 13px; }
+        .dropdown-content a:hover { background-color: #555; color: #ff9800; }
+        .show { display: block; }
+
+        .header { text-align: center; color: #333; margin-bottom: 30px; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        
+        h2 { border-bottom: 2px solid #4CAF50; padding-bottom: 10px; color: #2e7d32; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; font-size: 13px; }
+        th { background-color: #f8f9fa; color: #333; }
+        
+        .btn { padding: 6px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-revive { background-color: #4CAF50; color: white; }
+        .btn-delete { background-color: #f44336; color: white; }
+        .btn-toggle { background-color: #008CBA; color: white; }
+        
+        .feed-input-row { display: flex; gap: 10px; margin-bottom: 20px; }
+        .feed-input-row input { flex-grow: 1; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        
+        .status-active { color: #2e7d32; font-weight: bold; }
+        .status-inactive { color: #c62828; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <div style="width: 150px;"></div> 
+            <div class="nav-links">
+                <a href="/">Dashboard</a>
+                {% if group in ['admin', 'moderator', 'member_plus'] %}
+                <a href="/export">Export</a>
+                {% endif %}
+                <a href="/moderation">Moderation</a>
+            </div>
+            <div class="user-menu" id="userDropdown">
+                <span class="user-name">{{ username }} ▼</span>
+                <div class="dropdown-content" id="myDropdown">
+                    {% if group == 'admin' %}
+                    <a href="/users">Manage Users</a>
+                    {% endif %}
+                    <a href="/change_password">Change Password</a>
+                    <hr style="border: 0; border-top: 1px solid #555; margin: 0;">
+                    <a href="/logout">Logout</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="header">
+            <h1>Moderation Panel</h1>
+            <p>RSS Feed Management & Deleted Records Recovery</p>
+        </div>
+
+        <div class="card">
+            <h2>Manage RSS Feeds</h2>
+            <div class="feed-input-row">
+                <input type="text" id="new-feed-url" placeholder="Enter RSS Feed URL">
+                <button class="btn btn-revive" onclick="addFeed()">Add Feed</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Feed URL</th>
+                        <th>Status</th>
+                        <th>Last Checked</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="feeds-list"></tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>Deleted Records Audit</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Instrument</th>
+                        <th>Cause</th>
+                        <th>Effect</th>
+                        <th>Source</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="articles-list"></tbody>
+            </table>
+            <div id="pagination" style="display: flex; justify-content: center; padding: 20px 0; gap: 10px;"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        let totalPages = 1;
+
+        document.getElementById("userDropdown").onclick = function(e) {
+            document.getElementById("myDropdown").classList.toggle("show");
+            e.stopPropagation();
+        }
+        window.onclick = function(event) {
+            if (!event.target.matches('.user-name')) {
+                var dropdowns = document.getElementsByClassName("dropdown-content");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) openDropdown.classList.remove('show');
+                }
+            }
+        }
+
+        function loadFeeds() {
+            fetch('/api/feeds').then(res => res.json()).then(feeds => {
+                const list = document.getElementById('feeds-list');
+                list.innerHTML = feeds.map(f => `
+                    <tr>
+                        <td>${f.url}</td>
+                        <td><span class="${f.active ? 'status-active' : 'status-inactive'}">${f.active ? 'Active' : 'Inactive'}</span></td>
+                        <td>${f.last_checked || 'Never'}</td>
+                        <td>
+                            <button class="btn btn-toggle" onclick="toggleFeed(${f.id})">${f.active ? 'Deactivate' : 'Activate'}</button>
+                            <button class="btn btn-delete" onclick="deleteFeed(${f.id})">Delete</button>
+                        </td>
+                    </tr>
+                `).join('') || '<tr><td colspan="4">No feeds found.</td></tr>';
+            });
+        }
+
+        function addFeed() {
+            const url = document.getElementById('new-feed-url').value;
+            if (!url) return;
+            fetch('/api/feeds/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url })
+            }).then(() => { document.getElementById('new-feed-url').value = ''; loadFeeds(); });
+        }
+
+        function toggleFeed(id) {
+            fetch(`/api/feeds/toggle/${id}`, { method: 'POST' }).then(() => loadFeeds());
+        }
+
+        function deleteFeed(id) {
+            if (!confirm("Remove this feed source?")) return;
+            fetch(`/api/feeds/delete/${id}`, { method: 'DELETE' }).then(() => loadFeeds());
+        }
+
+        function loadArticles(page = 1) {
+            if (page < 1 || (totalPages > 0 && page > totalPages)) return;
+            currentPage = page;
+            fetch(`/api/articles?page=${page}&deleted_only=true`)
+                .then(res => res.json())
+                .then(data => {
+                    totalPages = data.total_pages;
+                    document.getElementById('articles-list').innerHTML = data.articles.map(item => `
+                        <tr>
+                            <td>${item.created_at}</td>
+                            <td>${item.instruments || '-'}</td>
+                            <td>${item.cause || ''}</td>
+                            <td>${item.effect || ''}</td>
+                            <td><a href="${item.link}" target="_blank" style="color: #0066cc;">${item.title}</a></td>
+                            <td><button class="btn btn-revive" onclick="reviveArticle(${item.id})">Revive</button></td>
+                        </tr>
+                    `).join('') || '<tr><td colspan="6">No removed records found.</td></tr>';
+                    renderPagination(data);
+                });
+        }
+
+        function reviveArticle(id) {
+            fetch(`/api/articles/revive/${id}`, { method: 'POST' }).then(() => loadArticles(currentPage));
+        }
+
+        function renderPagination(data) {
+            const pag = document.getElementById('pagination');
+            if (data.total_pages <= 1) { pag.innerHTML = ''; return; }
+            pag.innerHTML = `
+                <button class="btn" onclick="loadArticles(${data.page - 1})" ${data.page === 1 ? 'disabled' : ''}>Prev</button>
+                <span style="align-self: center;">Page ${data.page} of ${data.total_pages}</span>
+                <button class="btn" onclick="loadArticles(${data.page + 1})" ${data.page === data.total_pages ? 'disabled' : ''}>Next</button>
+            `;
+        }
+
+        loadFeeds();
+        loadArticles(1);
+    </script>
+</body>
+</html>

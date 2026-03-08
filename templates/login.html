@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Strategic News Bot</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f5f5f5; margin: 0; }
+        .top-nav { background: #333; padding: 10px 20px; display: flex; justify-content: flex-end; align-items: center; }
+        .top-nav a { color: #4CAF50; text-decoration: none; font-weight: bold; font-size: 14px; }
+        .login-container { display: flex; justify-content: center; align-items: center; height: calc(100vh - 40px); }
+        .login-card { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+        h1 { color: #333; margin-bottom: 30px; }
+        .form-group { margin-bottom: 20px; text-align: left; }
+        label { display: block; margin-bottom: 5px; color: #666; font-weight: bold; }
+        input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        .btn-login { background-color: #4CAF50; color: white; padding: 12px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-size: 16px; font-weight: bold; margin-top: 10px; }
+        .btn-login:hover { background-color: #45a049; }
+        .flash-messages { color: #f44336; background: #ffebee; padding: 10px; border-radius: 4px; margin-bottom: 20px; font-size: 14px; }
+        .footer-link { margin-top: 20px; font-size: 14px; color: #666; }
+        .footer-link a { color: #008CBA; text-decoration: none; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="top-nav">
+        <a href="/register">Register</a>
+    </div>
+    
+    <div class="login-container">
+        <div class="login-card">
+            <h1>News Bot Login</h1>
+            
+            {% with messages = get_flashed_messages() %}
+              {% if messages %}
+                <div class="flash-messages">
+                  {% for message in messages %}
+                    <div>{{ message }}</div>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
+
+            <form method="POST">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" name="username" id="username" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" name="password" id="password" required>
+                </div>
+                <button type="submit" class="btn-login">Login</button>
+            </form>
+
+            <div class="footer-link">
+                Don't have an account? <a href="/register">Register here</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

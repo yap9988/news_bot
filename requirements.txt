@@ -1,0 +1,6 @@
+flask
+sqlalchemy
+feedparser
+requests
+apscheduler
+waitress

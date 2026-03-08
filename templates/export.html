@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export Strategic Data - News Bot</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        
+        .nav { 
+            background: #333; 
+            padding: 10px 20px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            display: flex; 
+            align-items: center;
+            color: white;
+            position: relative;
+        }
+        .nav-links { flex-grow: 1; text-align: center; }
+        .nav a { color: white; text-decoration: none; margin: 0 15px; font-weight: bold; }
+        .nav a:hover { color: #4CAF50; }
+        
+        /* Dropdown Style */
+        .user-menu { position: relative; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .user-name { font-weight: bold; color: #4CAF50; }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background-color: #444;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1000;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .dropdown-content a {
+            color: white;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            margin: 0;
+            font-size: 13px;
+        }
+        .dropdown-content a:hover { background-color: #555; color: #ff9800; border-radius: 4px; }
+        .show { display: block; }
+
+        .header { text-align: center; color: #333; margin-bottom: 30px; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 40px; text-align: center; }
+        
+        .export-form { display: flex; flex-direction: column; gap: 20px; max-width: 400px; margin: 0 auto; }
+        .form-group { text-align: left; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; color: #666; }
+        input, select { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; font-size: 16px; }
+        
+        .btn-export { background-color: #2e7d32; color: white; padding: 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 16px; margin-top: 10px; }
+        .btn-export:hover { background-color: #1b5e20; }
+        
+        .info-text { margin-top: 20px; font-size: 14px; color: #888; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <div style="width: 150px;"></div> 
+            
+            <div class="nav-links">
+                <a href="/">Dashboard</a>
+                {% if group in ['admin', 'moderator', 'member_plus'] %}
+                <a href="/export">Export</a>
+                {% endif %}
+                {% if group in ['admin', 'moderator'] %}
+                <a href="/moderation">Moderation</a>
+                {% endif %}
+            </div>
+            
+            <div class="user-menu" id="userDropdown">
+                <span class="user-name">{{ username }} ▼</span>
+                <div class="dropdown-content" id="myDropdown">
+                    {% if group == 'admin' %}
+                    <a href="/users">Manage Users</a>
+                    {% endif %}
+                    <a href="/change_password">Change Password</a>
+                    <hr style="border: 0; border-top: 1px solid #555; margin: 0;">
+                    <a href="/logout">Logout</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="header">
+            <h1>Export Strategic Reports</h1>
+            <p>Download filtered analysis data for offline review</p>
+        </div>
+
+        <div class="card">
+            <div class="export-form">
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" id="export-start">
+                </div>
+                <div class="form-group">
+                    <label>End Date (Inclusive)</label>
+                    <input type="date" id="export-end">
+                </div>
+                <div class="form-group">
+                    <label>File Format</label>
+                    <select id="export-format">
+                        <option value="csv">CSV (Excel Spreadsheet)</option>
+                        <option value="txt">TXT (Professional Text Report)</option>
+                    </select>
+                </div>
+                <button class="btn-export" onclick="runExport()">Generate & Download</button>
+            </div>
+            <p class="info-text">Note: Only processed strategic analysis records are included in the export.</p>
+        </div>
+    </div>
+
+    <script>
+        // User Dropdown Logic
+        document.getElementById("userDropdown").onclick = function(e) {
+            document.getElementById("myDropdown").classList.toggle("show");
+            e.stopPropagation();
+        }
+        window.onclick = function(event) {
+            if (!event.target.matches('.user-name')) {
+                var dropdowns = document.getElementsByClassName("dropdown-content");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) openDropdown.classList.remove('show');
+                }
+            }
+        }
+
+        // Set default dates to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('export-start').value = today;
+        document.getElementById('export-end').value = today;
+
+        function runExport() {
+            const start = document.getElementById('export-start').value;
+            const end = document.getElementById('export-end').value;
+            const format = document.getElementById('export-format').value;
+            if (!start || !end) { alert("Please select a date range."); return; }
+            window.location.href = `/api/export?start_date=${start}&end_date=${end}&format=${format}`;
+        }
+    </script>
+</body>
+</html>

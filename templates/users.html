@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - News Bot</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        
+        .nav { 
+            background: #333; 
+            padding: 10px 20px; 
+            border-radius: 8px; 
+            margin-bottom: 20px; 
+            display: flex; 
+            align-items: center;
+            color: white;
+            position: relative;
+        }
+        .nav-links { flex-grow: 1; text-align: center; }
+        .nav a { color: white; text-decoration: none; margin: 0 15px; font-weight: bold; }
+        .nav a:hover { color: #4CAF50; }
+        
+        /* Dropdown Style */
+        .user-menu { position: relative; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        .user-name { font-weight: bold; color: #4CAF50; }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background-color: #444;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1000;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .dropdown-content a {
+            color: white;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            margin: 0;
+            font-size: 13px;
+        }
+        .dropdown-content a:hover { background-color: #555; color: #ff9800; border-radius: 4px; }
+        .show { display: block; }
+
+        .header { text-align: center; color: #333; margin-bottom: 30px; }
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 25px; margin-bottom: 20px; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; font-size: 14px; }
+        th { background-color: #f8f9fa; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #666; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        
+        .btn { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-add { background-color: #4CAF50; }
+        .btn-delete { background-color: #f44336; font-size: 12px; }
+        
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+        .admin { background: #e8f5e9; color: #2e7d32; }
+        .moderator { background: #e3f2fd; color: #1565c0; }
+        .member_plus { background: #fff3e0; color: #e65100; }
+        .member { background: #f5f5f5; color: #616161; }
+        .inactive { background: #ffebee; color: #c62828; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <div style="width: 150px;"></div> 
+            
+            <div class="nav-links">
+                <a href="/">Dashboard</a>
+                <a href="/export">Export</a>
+                <a href="/moderation">Moderation</a>
+            </div>
+            
+            <div class="user-menu" id="userDropdown">
+                <span class="user-name">{{ username }} ▼</span>
+                <div class="dropdown-content" id="myDropdown">
+                    <a href="/change_password">Change Password</a>
+                    <hr style="border: 0; border-top: 1px solid #555; margin: 0;">
+                    <a href="/logout">Logout</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="header">
+            <h1>User Management</h1>
+            <p>Create and manage user groups and permissions</p>
+        </div>
+
+        <div class="card">
+            <h3>Create New User</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1.5fr 1fr 150px; gap: 15px; align-items: end;">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="new-username" placeholder="Username">
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="new-email" placeholder="Email (Optional)">
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="new-password" placeholder="Password">
+                </div>
+                <div class="form-group">
+                    <label>Group</label>
+                    <select id="new-group">
+                        <option value="admin">Admin</option>
+                        <option value="moderator">Moderator</option>
+                        <option value="member_plus">Member Plus</option>
+                        <option value="member">Member</option>
+                        <option value="member_inactive" selected>Member (Inactive)</option>
+                    </select>
+                </div>
+                <button class="btn btn-add" onclick="addUser()" style="margin-bottom: 15px;">Add User</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Registered Users</h3>
+            <table id="users-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Group</th>
+                        <th>Joined</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-list">
+                    <tr><td colspan="5" style="text-align:center;">Loading users...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // User Dropdown Logic
+        document.getElementById("userDropdown").onclick = function(e) {
+            document.getElementById("myDropdown").classList.toggle("show");
+            e.stopPropagation();
+        }
+        window.onclick = function(event) {
+            if (!event.target.matches('.user-name')) {
+                var dropdowns = document.getElementsByClassName("dropdown-content");
+                for (var i = 0; i < dropdowns.length; i++) {
+                    var openDropdown = dropdowns[i];
+                    if (openDropdown.classList.contains('show')) openDropdown.classList.remove('show');
+                }
+            }
+        }
+
+        function loadUsers() {
+            fetch('/api/users').then(res => res.json()).then(users => {
+                const list = document.getElementById('users-list');
+                let html = '';
+                users.forEach(u => {
+                    const badgeClass = u.group === 'member_inactive' ? 'inactive' : u.group;
+                    html += `
+                        <tr>
+                            <td><strong>${u.username}</strong></td>
+                            <td>${u.email || '-'}</td>
+                            <td><span class="badge ${badgeClass}">${u.group.replace('_', ' ')}</span></td>
+                            <td>${u.created_at}</td>
+                            <td>
+                                <select onchange="updateGroup(${u.id}, this.value)" style="width: auto; padding: 4px; font-size: 12px; margin-right: 10px;">
+                                    <option value="admin" ${u.group === 'admin' ? 'selected' : ''}>Admin</option>
+                                    <option value="moderator" ${u.group === 'moderator' ? 'selected' : ''}>Moderator</option>
+                                    <option value="member_plus" ${u.group === 'member_plus' ? 'selected' : ''}>Member Plus</option>
+                                    <option value="member" ${u.group === 'member' ? 'selected' : ''}>Member</option>
+                                    <option value="member_inactive" ${u.group === 'member_inactive' ? 'selected' : ''}>Member (Inactive)</option>
+                                </select>
+                                <button class="btn btn-delete" onclick="deleteUser(${u.id})">Delete</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                list.innerHTML = html || '<tr><td colspan="5">No users found.</td></tr>';
+            });
+        }
+
+        function addUser() {
+            const username = document.getElementById('new-username').value;
+            const email = document.getElementById('new-email').value;
+            const password = document.getElementById('new-password').value;
+            const group = document.getElementById('new-group').value;
+            if (!username || !password) { alert("Username and Password are required"); return; }
+            fetch('/api/users/add', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, email, password, group })
+            }).then(res => res.json()).then(data => {
+                if (data.success) { alert("User added!"); loadUsers(); } else alert(data.error);
+            });
+        }
+
+        function updateGroup(userId, newGroup) {
+            fetch(`/api/users/update/${userId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ group: newGroup })
+            }).then(res => res.json()).then(data => {
+                if (!data.success) alert(data.error);
+                else loadUsers();
+            });
+        }
+
+        function deleteUser(userId) {
+            if (!confirm("Are you sure?")) return;
+            fetch(`/api/users/delete/${userId}`, { method: 'DELETE' })
+                .then(res => res.json()).then(data => {
+                    if (data.success) loadUsers();
+                    else alert(data.error);
+                });
+        }
+
+        loadUsers();
+    </script>
+</body>
+</html>
